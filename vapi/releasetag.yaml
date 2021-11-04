@@ -1,0 +1,10 @@
+apiVersion: v1alpha1
+group: management
+kind: ReleaseTag
+name: webhooksite1
+metadata:
+  scope:
+    kind: VirtualAPI
+    name: webhooksite
+spec:
+  releaseType: major

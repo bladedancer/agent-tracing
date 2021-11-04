@@ -1,0 +1,13 @@
+apiVersion: v1alpha1
+group: management
+kind: Deployment
+name: webhooksite
+metadata:
+  scope:
+    kind: Environment
+    name: tracing
+tags:
+  - v1
+spec:
+  virtualAPIRelease: webhooksite-1.0.0
+  virtualHost: "tracing.ampgw.sandbox.axwaytest.net"
