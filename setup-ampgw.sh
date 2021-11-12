@@ -2,6 +2,14 @@
 
 . ./env.sh
 
+
+echo ================================
+echo === Bootstraping images      ===
+echo ================================
+docker pull axway.jfrog.io/ampc-docker-release-ptx/ampgw-install-axway-cli:0.4.0  
+k3d image import --cluster $CLUSTER axway.jfrog.io/ampc-docker-release-ptx/ampgw-install-axway-cli:0.4.0
+k3d image import --cluster $CLUSTER ampc-docker-snapshot-ptx.artifactory-ptx.ecd.axway.int/ampgw-governance-agent:0.5.0-POC-0012-SNAPSHOT
+
 echo ================================
 echo === Creating Service Account ===
 echo ================================
@@ -50,6 +58,10 @@ imagePullSecrets:
 ampgw-governance-agent:
   imagePullSecrets: 
     - name: regcred
+  readinessProbe:
+    timeoutSeconds: 5
+  livenessProbe:
+    timeoutSeconds: 5
   env:
     CENTRAL_AUTH_URL: $CENTRAL_AUTH_URL
     CENTRAL_URL: $CENTRAL_URL
@@ -70,6 +82,76 @@ provisioning:
 ampgw-proxy:
   imagePullSecrets:
     - name: regcred
+
+  # HACK FOR NOW TO ADD OT-CLUSTER
+  templates:
+    envoy.yaml: |-
+      node:
+        cluster: ampgw
+        id: ampgw
+
+      admin:
+        address:
+          socket_address:
+            address: 0.0.0.0
+            port_value: 9901
+
+      dynamic_resources:
+        ads_config:
+          api_type: GRPC
+          transport_api_version: V3
+          grpc_services:
+          - envoy_grpc:
+              cluster_name: agent-cluster
+          set_node_on_first_message_only: true
+        cds_config:
+          resource_api_version: V3
+          ads: {}
+        lds_config:
+          resource_api_version: V3
+          ads: {}
+          
+      static_resources:
+        clusters:
+        - connect_timeout: 1s
+          type: LOGICAL_DNS
+          load_assignment:
+            cluster_name: agent-cluster
+            endpoints:
+            - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: ampgw-governance-agent
+                      port_value: 18000
+          http2_protocol_options: {}
+          name: agent-cluster
+        - connect_timeout: 1s
+          type: LOGICAL_DNS
+          load_assignment:
+            cluster_name: ot-cluster
+            endpoints:
+            - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: tracing-ot-collector.observability.svc.cluster.local
+                      port_value: 4317
+          http2_protocol_options: {}
+          name: ot-cluster
+        - connect_timeout: 1s
+          type: LOGICAL_DNS
+          load_assignment:
+            cluster_name: jaeger-cluster
+            endpoints:
+            - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: tracing-jaeger-collector.observability.svc.cluster.local
+                      port_value: 9411
+          http2_protocol_options: {}
+          name: jaeger-cluster
 EOF
 
 helm delete ampgw --wait

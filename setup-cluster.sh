@@ -18,5 +18,7 @@ kubectl create secret generic regcred \
     --from-file=.dockerconfigjson=$HOME/.docker/config.json \
     --type=kubernetes.io/dockerconfigjson
 
+kubectl wait --timeout 10m --for=condition=Ready pods --all 
+
 echo "RUN:"
 echo "export KUBECONFIG=$(k3d kubeconfig write $CLUSTER)"
